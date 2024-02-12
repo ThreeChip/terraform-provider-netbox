@@ -80,6 +80,7 @@ func resourceNetboxInterface() *schema.Resource {
 				Type:     schema.TypeInt,
 				Optional: true,
 			},
+			customFieldsKey: customFieldsSchema,
 		},
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
@@ -121,6 +122,12 @@ func resourceNetboxInterfaceCreate(ctx context.Context, d *schema.ResourceData, 
 	if untaggedVlan, ok := d.Get("untagged_vlan").(int); ok && untaggedVlan != 0 {
 		data.UntaggedVlan = int64ToPtr(int64(untaggedVlan))
 	}
+	
+	ct, ok := d.GetOk(customFieldsKey)
+	if ok {
+		data.CustomFields = ct
+	}
+	
 	params := virtualization.NewVirtualizationInterfacesCreateParams().WithData(&data)
 
 	res, err := api.Virtualization.VirtualizationInterfacesCreate(params, nil)
@@ -172,6 +179,11 @@ func resourceNetboxInterfaceRead(ctx context.Context, d *schema.ResourceData, m 
 		d.Set("untagged_vlan", iface.UntaggedVlan.ID)
 	}
 
+	cf := getCustomFields(vm.CustomFields)
+	if cf != nil {
+		d.Set(customFieldsKey, cf)
+	}
+		
 	return diags
 }
 
@@ -202,7 +214,10 @@ func resourceNetboxInterfaceUpdate(ctx context.Context, d *schema.ResourceData, 
 		TaggedVlans:    taggedVlans,
 		VirtualMachine: &virtualMachineID,
 	}
-
+	cf, ok := d.GetOk(customFieldsKey)
+	if ok {
+		data.CustomFields = cf
+	}
 	if d.HasChange("mac_address") {
 		macAddress := d.Get("mac_address").(string)
 		data.MacAddress = &macAddress
